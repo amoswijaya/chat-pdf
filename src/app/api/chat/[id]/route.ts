@@ -4,6 +4,9 @@ import { supabase } from "@/lib/supabase";
 import { deleteDocumentByPrefix } from "@/lib/pincone";
 
 export type Context = { params: Promise<{ id: string }> };
+
+export const runtime = "nodejs"; // penting di Vercel (bukan Edge)
+export const dynamic = "force-dynamic"; // opsional, hindari cache
 export async function GET(_req: NextRequest, { params }: Context) {
   try {
     const { id } = await params;
