@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DIRECT_URL")
+}
+
+model User {
+  id      String  @id @default(uuid()) @db.Uuid
+  clerkId String  @unique
+  email   String  @unique
+  name    String?
+
+  chats    Chat[]
+  messages Message[]
+
+  @@map("Users")
+}
+
+model Chat {
+  id     String @id @default(uuid()) @db.Uuid // <- UUID (bukan cuid)
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fileName          String
+  filePath          String
+  pineconeNamespace String
+  fileSize          Int
+  mimeType          String
+  fileUrl           String
+  createdAt         DateTime @default(now())
+
+  // field balik relasi ke Message
+  messages Message[]
+
+  @@map("Chats") // opsional biar konsisten penamaan tabel
+}
+
+model Message {
+  id     String @id @default(uuid()) @db.Uuid
+  chatId String @db.Uuid
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role      MessageRole
+  content   String
+  createdAt DateTime    @default(now())
+
+  @@map("Messages")
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+
+
