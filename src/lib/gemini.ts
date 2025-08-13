@@ -10,57 +10,74 @@ const embeddings = new GoogleGenerativeAIEmbeddings({
   apiKey: process.env.GOOGLE_API_KEY!,
   model: "text-embedding-004",
 });
-
 const clean = (t: string) => t.replace(/\s+/g, " ").trim();
-
-export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
+export async function generateEmbeddings(texts: string[]) {
   return embeddings.embedDocuments(texts.map(clean));
 }
-export async function generateEmbedding(text: string): Promise<number[]> {
+export async function generateEmbedding(text: string) {
   return embeddings.embedQuery(clean(text));
 }
 
-const GEMINI_PRIMARY = "gemini-1.5-flash";
-const GEMINI_SECONDARY = "gemini-1.5-flash-8b";
+const TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS ?? 8000);
+const MAX_TOKENS = Number(process.env.LLM_MAX_TOKENS ?? 512);
 
-const geminiPrimary = new ChatGoogleGenerativeAI({
-  apiKey: process.env.GOOGLE_API_KEY!,
-  model: GEMINI_PRIMARY,
-  temperature: 0.2,
-  maxOutputTokens: 2048,
-});
-
-const geminiSecondary = new ChatGoogleGenerativeAI({
-  apiKey: process.env.GOOGLE_API_KEY!,
-  model: GEMINI_SECONDARY,
-  temperature: 0.2,
-  maxOutputTokens: 2048,
-});
-
-const deepseek = new ChatOpenAI({
+const dsChat = new ChatOpenAI({
   apiKey: process.env.DEEPSEEK_API_KEY!,
   configuration: { baseURL: "https://api.deepseek.com" },
-  model: "deepseek-reasoner", // atau "deepseek-reasoner"
+  model: "deepseek-chat",
   temperature: 0.2,
+  maxRetries: 0,
 });
 
-function isQuotaOrOverload(e: any) {
-  const msg = String(e?.message ?? e ?? "");
-  return /429|quota|Too Many Requests|503|overload/i.test(msg);
+const gemini8b = new ChatGoogleGenerativeAI({
+  apiKey: process.env.GOOGLE_API_KEY!,
+  model: "gemini-1.5-flash-8b",
+  temperature: 0.2,
+  maxOutputTokens: MAX_TOKENS,
+  maxRetries: 0,
+});
+const geminiFlash = new ChatGoogleGenerativeAI({
+  apiKey: process.env.GOOGLE_API_KEY!,
+  model: "gemini-1.5-flash",
+  temperature: 0.2,
+  maxOutputTokens: MAX_TOKENS,
+  maxRetries: 0,
+});
+
+function withTimeout<T>(ms: number, fn: (signal: AbortSignal) => Promise<T>) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(new Error(`Timeout ${ms}ms`)), ms);
+  return fn(ctrl.signal).finally(() => clearTimeout(t));
+}
+
+function toStr(c: any): string {
+  if (typeof c === "string") return c;
+  if (Array.isArray(c))
+    return c.map((p) => (typeof p === "string" ? p : p?.text ?? "")).join("\n");
+  return (c?.text ?? String(c ?? "")).trim();
 }
 
 export const llm = {
   async invoke(messages: BaseMessage[]) {
+    const a = withTimeout(TIMEOUT_MS, (signal) =>
+      dsChat.invoke(messages, { signal })
+    );
+    const b = withTimeout(TIMEOUT_MS, (signal) =>
+      gemini8b.invoke(messages, { signal })
+    );
+
     try {
-      return await deepseek.invoke(messages);
-    } catch (e1) {
-      if (!isQuotaOrOverload(e1)) throw e1;
-      try {
-        return await geminiSecondary.invoke(messages);
-      } catch (e2) {
-        if (!isQuotaOrOverload(e2) || !deepseek) throw e2;
-        return await geminiPrimary.invoke(messages);
-      }
+      const winner = await Promise.any([a, b]);
+      return winner;
+    } catch {
+      return await withTimeout(TIMEOUT_MS, (signal) =>
+        geminiFlash.invoke(messages, { signal })
+      );
     }
+  },
+
+  async invokeText(messages: BaseMessage[]) {
+    const r = await this.invoke(messages);
+    return toStr((r as any)?.content);
   },
 };

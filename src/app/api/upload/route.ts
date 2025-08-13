@@ -40,7 +40,6 @@ export async function POST(req: NextRequest) {
 
     const { namespace } = await upsertDocumentToPinecone({
       filePath: up.path,
-      clerkId,
     });
 
     const user = await prisma.user.findUnique({ where: { clerkId } });

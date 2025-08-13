@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
-import { deleteDocumentByPrefix } from "@/lib/pincone";
+import { deleteDocumentNamespace } from "@/lib/pincone";
 
 export type Context = { params: Promise<{ id: string }> };
 
-export const runtime = "nodejs"; // penting di Vercel (bukan Edge)
-export const dynamic = "force-dynamic"; // opsional, hindari cache
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export async function GET(_req: NextRequest, { params }: Context) {
   try {
     const { id } = await params;
@@ -33,10 +33,7 @@ export async function DELETE(_req: Request, { params }: Context) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     if (chat.pineconeNamespace && chat.filePath) {
-      await deleteDocumentByPrefix({
-        namespace: chat.pineconeNamespace,
-        filePath: chat.filePath,
-      });
+      await deleteDocumentNamespace(chat.pineconeNamespace);
     }
 
     if (chat.filePath) {

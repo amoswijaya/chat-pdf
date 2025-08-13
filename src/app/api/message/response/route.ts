@@ -5,7 +5,6 @@ import { MessageRole } from "@prisma/client";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { getContext } from "@/lib/context";
 import { llm } from "@/lib/gemini";
-import { auth } from "@clerk/nextjs/server";
 
 export const runtime = "nodejs";
 
@@ -40,8 +39,6 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    const { userId: namespace } = await auth();
-
     const {
       message,
       chatId,
@@ -68,10 +65,16 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    const chat = await prisma.chat.findUnique({ where: { id: chatId } });
+    if (!chat?.pineconeNamespace) {
+      return NextResponse.json(
+        { error: "Chat/namespace not found" },
+        { status: 404 }
+      );
+    }
 
     const contextChunks = await getContext(message, {
-      namespace: namespace as string,
-      filePath,
+      namespace: chat.pineconeNamespace,
       topK,
       scoreThreshold,
       debug,
@@ -95,7 +98,10 @@ export async function POST(req: NextRequest) {
       ].join("\n")
     );
 
+    console.log(ctxText);
+
     const llmResp = await llm.invoke([system, human]);
+    console.log(llmResp, "==========");
     const content = toText(llmResp?.content);
 
     const saved = await prisma.message.create({
