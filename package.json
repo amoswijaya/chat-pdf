@@ -4,12 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:migrate": "prisma migrate"
+    "db:migrate": "prisma migrate",
+    "postinstall": "prisma generate",
+    "build": "next build"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.29.0",
