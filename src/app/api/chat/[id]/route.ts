@@ -1,17 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
 import { deleteDocumentByPrefix } from "@/lib/pincone";
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { id: string } }
-) {
+export type Context = { params: Promise<{ id: string }> };
+export async function GET(_req: NextRequest, { params }: Context) {
   try {
     const { id } = await params;
     const chat = await prisma.chat.findUnique({ where: { id } });
-    if (!chat)
+
+    if (!chat) {
       return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+    }
     return NextResponse.json(chat, { status: 200 });
   } catch (err) {
     console.error("Error in GET route:", err);
@@ -22,10 +22,7 @@ export async function GET(
   }
 }
 
-export async function DELETE(
-  _req: Request,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(_req: Request, { params }: Context) {
   try {
     const { id } = await params;
     const chat = await prisma.chat.findUnique({ where: { id } });

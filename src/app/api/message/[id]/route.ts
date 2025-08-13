@@ -1,10 +1,8 @@
 import prisma from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
+import { Context } from "../../chat/[id]/route";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, { params }: Context) {
   const { id } = await params;
   try {
     const message = await prisma.message.findMany({

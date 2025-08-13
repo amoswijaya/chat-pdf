@@ -77,8 +77,6 @@ export async function POST(req: NextRequest) {
       debug,
     });
 
-    console.log("contextChunks:", contextChunks);
-
     const ctxText = (contextChunks ?? []).join("\n---\n").slice(0, 10_000);
     const ambiguous = isAmbiguous(message);
     const system = new SystemMessage(
